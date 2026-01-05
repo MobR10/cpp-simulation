@@ -54,5 +54,12 @@ inline std::unordered_map<TerrainType,std::string> terrainToString ={
     {TerrainType::GROUND,"PAMANT"}
 };
 
+inline std::unordered_map<AgentState,std::string> agentStateToString ={
+    {AgentState::IDLE,"IDLE"},
+    {AgentState::MOVING,"MOVING"},
+    {AgentState::CHARGING,"CHARGING"},
+    {AgentState::DEAD,"DEAD"}
+};
+
 #define mapFileName "map.txt"
 #define simulationFile "simulation_setup.txt"

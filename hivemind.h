@@ -67,6 +67,7 @@ class HiveMind{
 
         void assignNextPackage(Agent& agent);
 
+        void decidePackageAssignment();
 
         void printSimulationParameters();
 

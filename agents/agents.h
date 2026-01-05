@@ -10,12 +10,6 @@
 #include <iostream>
 #include <queue>
 
-// class IAgent{
-//     public:
-//         virtual void move() = 0;
-//         virtual ~IAgent(){};
-// };
-
 class HiveMind;
 
 class Agent{
@@ -37,8 +31,8 @@ class Agent{
         Agent(char _symbol,TerrainType _terrain, size_t _speed, size_t _maxBattery, size_t _consumption, size_t _cost, size_t _capacity);
         virtual void tick(const std::vector<std::vector<Cell>>& map, HiveMind& HiveMind,int& profit, size_t currentTick, size_t& delivered, size_t& deadAgents, size_t& dropped);
         void decideNextPath(const std::vector<std::vector<Cell>>& map, HiveMind& hiveMind);
-        bool tryDelivery(int& profit, size_t currentTick,size_t& delivered);
-        void dropPackages(int& profit,size_t& dropped);
+        void tryDelivery(int& profit, size_t currentTick,size_t& delivered);
+        void dropPackages(int& profit,size_t& dropped,HiveMind& hiveMind);
         virtual ~Agent(){};
 
         void takePackages();
@@ -76,46 +70,24 @@ class Agent{
 
         bool at(std::pair<size_t,size_t> _coordinates);
 
-        bool canMove() const;
-
-        bool hasPath() const;
-
-        void setTargetBase(bool goToBase) { targetBase = goToBase ; };
-
-        bool isPathEmpty();
-
         bool hasPackages();
 };
 
-// class AgentOperator{
-//     private:
-//         IAgent * agent;
-
-//     public:
-//         AgentOperator();
-//         AgentOperator(IAgent* _agent);
-//         void runAgent();
-//         void setAgentType(IAgent* _agent);
-//         ~AgentOperator();
-// };
-
-class Drone: /*public IAgent,*/ public Agent{
+class Drone: public Agent{
 
     public:
         Drone();
-        // void move();
+        
 };
 
-class Robot: /*public IAgent,*/ public Agent{
+class Robot: public Agent{
 
     public:
         Robot();
-        // void move();
 };
 
-class Scooter: /*public IAgent,*/ public Agent{
+class Scooter: public Agent{
     
     public:
         Scooter();
-        // void move();
 };

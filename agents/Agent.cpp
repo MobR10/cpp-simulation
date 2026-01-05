@@ -1,12 +1,14 @@
 #include "agents.h"
 #include "../hivemind.h"
 #include "../astar.h"
+#include "../types.h"
 
 size_t Agent::numberOfAgents = 0;
 
 void Agent::logMessage(const std::string& message){
-    std::printf("Agent #%llu coords(%llu,%llu): %s\n",id,coordinates.first,coordinates.second,message.c_str());
+    std::printf("Agent #%llu coords(%llu,%llu), state %s: %s\n",id,coordinates.first,coordinates.second,agentStateToString[state].c_str(),message.c_str());
 }
+
 Agent::Agent(char _symbol,TerrainType _terrain, size_t _speed, size_t _maxBattery, size_t _consumption, size_t _cost, size_t _capacity):
 symbol(_symbol),
 terrain(_terrain),
@@ -39,36 +41,40 @@ bool Agent::at(std::pair<size_t,size_t> _coordinates){
     return coordinates == _coordinates;
 }
 
-bool Agent::hasPath() const{
-    return !currentPath.empty();
-}
-
-bool Agent::canMove() const{
-    return currentBattery >= consumption;
-}
-
 void Agent::tick(const std::vector<std::vector<Cell>>& map, HiveMind& hiveMind, int& profit, size_t currentTick, size_t& delivered, size_t& deadAgents, size_t& dropped){
     if (state == AgentState::DEAD)
         return;
 
-    profit -= cost;
+    if(state != AgentState::IDLE)
+        profit -= cost;
 
-    if(state == AgentState::IDLE)
-            takePackages();
+    if(coordinates == hiveMind.getBaseCoords())
+        takePackages();
     
-    if (state != AgentState::MOVING && currentBattery < maxBattery) {
+    // always charge fully whenever at a base or station
+    if (state == AgentState::CHARGING && currentBattery < maxBattery) {
         currentBattery = std::min(currentBattery + static_cast<size_t>(maxBattery * 0.25),maxBattery);
         logMessage("Battery charged: ");
         std::cout<< currentBattery<< std::endl;
         return;
     }
     
-    if (currentPath.empty()){
+    if(currentPath.empty()){
         decideNextPath(map, hiveMind);
+    }
+
+    if(state == AgentState::IDLE && !currentPath.empty()){
+        profit -= cost;
+    }
+
+    if(!currentPath.empty() && currentBattery * 100 < 25 * maxBattery){
+        currentPath = aStar(map,coordinates,packages.front()->client,*this);
+        logMessage("Low battery, recalculating path to client");
     }
 
     if (!currentPath.empty()) {
 
+        state = AgentState::MOVING;
         currentBattery -= consumption;
         logMessage("Battery consumed: ");
         std::cout<< currentBattery<< std::endl;
@@ -84,7 +90,6 @@ void Agent::tick(const std::vector<std::vector<Cell>>& map, HiveMind& hiveMind, 
             Cell cell = map[coordinates.first][coordinates.second];
 
             if (cell == Cell::BASE || cell == Cell::STATION) {
-                state = (cell == Cell::BASE) ? AgentState::IDLE : AgentState::CHARGING;
 
                 if (cell == Cell::BASE)
                     takePackages();
@@ -94,6 +99,8 @@ void Agent::tick(const std::vector<std::vector<Cell>>& map, HiveMind& hiveMind, 
                 std::cout<< currentBattery<< std::endl;
                 
                 if(currentBattery < maxBattery){
+                    logMessage("stopped to charge.");
+                    state = AgentState::CHARGING;
                     return;
                 }
             }
@@ -106,13 +113,12 @@ void Agent::tick(const std::vector<std::vector<Cell>>& map, HiveMind& hiveMind, 
         state = AgentState::DEAD;
         profit += deadAgent;
         deadAgents++;
-        dropPackages(profit, dropped);
+        dropPackages(profit, dropped,hiveMind);
         logMessage("mf is deadass.");
     }
 }
 
-void Agent::decideNextPath(const std::vector<std::vector<Cell>>& map, HiveMind& hiveMind)
-{   
+void Agent::decideNextPath(const std::vector<std::vector<Cell>>& map, HiveMind& hiveMind){   
     if (hasPackages()) {
         currentPath = aStar(map, coordinates, packages.front()->client, *this);
         logMessage("Assigning path to client");
@@ -122,12 +128,9 @@ void Agent::decideNextPath(const std::vector<std::vector<Cell>>& map, HiveMind& 
         logMessage("Assigning path to base");
     }
     else {
-        state = AgentState::IDLE;
+        state = (currentBattery < maxBattery) ? AgentState::CHARGING : AgentState::IDLE;
+        // logMessage("No packages and inside base. No path assigned. Staying at base.");
     }
-}
-
-bool Agent::isPathEmpty(){
-    return currentPath.empty();
 }
 
 bool Agent::hasPackages(){
@@ -138,23 +141,34 @@ bool Agent::hasPackages(){
     return false;
 }
 
-bool Agent::tryDelivery(int& profit, size_t currentTick,size_t& delivered){
-    if(coordinates == packages.front()->client){
-        delivered++;
-        if(currentTick - packages.front()->firstTick > packages.front()->deadline){
-            profit += deliveredLate; 
-            logMessage("Package arrived LATE.");
-        }else logMessage("Package arrived IN TIME."); 
-        // Remove the package from agent's list and set state to IDLE
-        std::printf("REWARD: %llu - %d\n",packages.front()->reward,currentTick - packages.front()->firstTick > packages.front()->deadline ? (-deliveredLate) : 0);
-        profit += packages.front()->reward;
-        packages.erase(packages.begin()); 
-        return true;
+void Agent::tryDelivery(int& profit, size_t currentTick,size_t& delivered){
+    if(!packages.empty()){
+        if(coordinates == packages.front()->client){
+            delivered++;
+            if(currentTick - packages.front()->firstTick > packages.front()->deadline){
+                profit += deliveredLate; 
+                logMessage("Package arrived LATE.");
+            }else logMessage("Package arrived IN TIME."); 
+            // Remove the package from agent's list and set state to IDLE
+            std::printf("REWARD: %llu - %d\n",packages.front()->reward,currentTick - packages.front()->firstTick > packages.front()->deadline ? (-deliveredLate) : 0);
+            profit += packages.front()->reward;
+            packages.erase(packages.begin()); 
+        }
     }
-    return false;
 }
 
-void Agent::dropPackages(int& profit,size_t& dropped){
-    profit += undelivered * static_cast<int>(packages.size());
-    dropped += packages.size();
+void Agent::dropPackages(int& profit,size_t& dropped,HiveMind& hiveMind){
+    for(size_t i = 0; i < packages.size(); i++){
+        auto package = packages[i];
+        if(package->location == Package::Location::AGENT){
+            profit += undelivered;
+            dropped++;
+        }
+        if(package->location == Package::Location::BASE){
+            package->agentId = 0;
+            hiveMind.getPackages().push_back(package);
+            packages.erase(packages.begin() + i);
+            i--;
+        }
+    }
 }

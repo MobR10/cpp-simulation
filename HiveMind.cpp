@@ -1,5 +1,6 @@
 #include "hivemind.h"
 #include "types.h"
+#include "astar.h"
 
 #include <fstream>
 #include <iostream>
@@ -128,6 +129,87 @@ void HiveMind::assignNextPackage(Agent& agent) {
                 pkg.client.second);
 }
 
+constexpr int DIST_WEIGHT = 10;       // weight for distance
+constexpr int STATION_WEIGHT = 5;     // weight for recharge stations
+
+void HiveMind::decidePackageAssignment() {
+    if(packages.empty())
+        return;
+        
+    int minCost = INT_MAX;
+    Agent* selectedAgent = nullptr;
+
+    for (auto& agent : agents) {
+        if (agent->getState() == AgentState::DEAD)
+            continue;
+
+        int cost = 0;
+        int stationCount = 0;
+        size_t batteryLeft = agent->getCurrentBattery();
+        std::pair<size_t, size_t> agentCoords = agent->getCoordinates();
+
+        // Consider packages already in agent's possession
+        if (agent->hasPackages() && agent->getPackages().size() < agent->getCapacity()) {
+            for (auto& package : agent->getPackages()) {
+                if (package->location == Package::Location::AGENT) {
+                    auto [dist, stations] = bfsDistance(map, agentCoords, package->client, *agent);
+
+                    // Ticks needed related to agent's speed
+                    int ticksNeeded = static_cast<int>(std::ceil(float(dist) / agent->getSpeed()));
+
+                    // Reduce battery for this path
+                    if (batteryLeft < ticksNeeded * agent->getConsumption()) {
+                        // Agent needs to stop at stations along the way
+                        batteryLeft = agent->getMaxBattery();
+                        cost += (ticksNeeded + stations) * DIST_WEIGHT; // extra cost for recharging delay
+                    } else {
+                        batteryLeft -= ticksNeeded * agent->getConsumption();
+                        cost += ticksNeeded * DIST_WEIGHT;
+                    }
+
+                    stationCount += stations;
+                    agentCoords = package->client;
+                }
+            }
+
+            // Return to base to pick up new package
+            auto [dist, stations] = bfsDistance(map, agentCoords, getBaseCoords(), *agent);
+            int ticksNeeded = static_cast<int>(std::ceil(float(dist) / agent->getSpeed()));
+            if (batteryLeft < ticksNeeded * agent->getConsumption()) {
+                batteryLeft = agent->getMaxBattery();
+                cost += (ticksNeeded + stations) * DIST_WEIGHT;
+            } else {
+                batteryLeft -= ticksNeeded * agent->getConsumption();
+                cost += ticksNeeded * DIST_WEIGHT;
+            }
+            stationCount += stations;
+            agentCoords = getBaseCoords();
+        }
+
+        // Now consider the new package at base
+        auto [dist, stations] = bfsDistance(map, agentCoords, packages.front()->client, *agent);
+        int ticksNeeded = static_cast<int>(std::ceil(float(dist) / agent->getSpeed()));
+        if (batteryLeft < ticksNeeded * agent->getConsumption()) {
+            batteryLeft = agent->getMaxBattery();
+            cost += (ticksNeeded + stations) * DIST_WEIGHT;
+        } else {
+            batteryLeft -= ticksNeeded * agent->getConsumption();
+            cost += ticksNeeded * DIST_WEIGHT;
+        }
+        stationCount += stations;
+
+        // Prefer paths with recharge stations
+        cost -= stationCount * STATION_WEIGHT;
+
+        if (cost < minCost) {
+            minCost = cost;
+            selectedAgent = agent.get();
+        }
+    }
+
+    if (selectedAgent != nullptr)
+        assignNextPackage(*selectedAgent);
+}
 
 
 void HiveMind::printSimulationParameters(){

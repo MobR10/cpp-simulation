@@ -13,13 +13,6 @@
 
 using namespace std;
 
-void print(std::vector<std::pair<size_t,size_t>>& path, size_t id){
-    cout<<"Path for agent #" << id << ": ";
-    for(size_t i=0; i < path.size(); i++){
-        printf("(%llu,%llu) -> ",path.at(i).first,path.at(i).second);
-    }
-}
-
 #define debug 1
 
 const AgentState CHARGING = AgentState::CHARGING;
@@ -51,7 +44,7 @@ int main(){
     cout <<"Base coords: " << baseCoords.first << "," << baseCoords.second << endl << endl;
     #endif
 
-    const double deltaTime = 0.00833; // 16 ms per tick (~60 FPS)
+    const double deltaTime = 0.00833; // 8.33 ms per tick (~120 FPS)
 
     int profit = 0;
     size_t deadAgents = 0;
@@ -69,12 +62,13 @@ int main(){
             spawnedPackages++;
         }
 
+        for(size_t i = 0; i < hiveMind.getPackages().size(); i++){
+            hiveMind.decidePackageAssignment();
+        }
+
         for (auto& agent : agents){
             if(agent->getState() == AgentState::DEAD)
                 continue;
-
-            hiveMind.assignNextPackage(*agent);
-        
             agent->tick(map,hiveMind,profit,tick,delivered,deadAgents,dropped);
         }
 
@@ -88,15 +82,94 @@ int main(){
         }
         std::cout<< std::endl;
     }
+    
+    // check if the simulation ran out of ticks time
+    // if positive, then reset the assigned packages
 
     for(auto& agent : agents){
-        if(agent->getPackages().size() > 0){
-                std::printf("Found %llu undelivered packages on a %s.\n",agent->getPackages().size(),agent->getName().c_str());
+        if(agent->getState() == AgentState::DEAD)
+            continue;
+        for(size_t i = 0; i < agent->getPackages().size(); i++){
+            auto package = agent->getPackages().at(i);
+            if(package->location == Package::Location::BASE){
+                package->agentId = 0;
+                hiveMind.getPackages().push_back(package);
+                agent->getPackages().erase(agent->getPackages().begin() + i);
+                i--;
             }
-        if(agent->getState() == AgentState::DEAD){
-            std::printf("Found a dead %s\n",agent->getName().c_str());
         }
     }
 
+    std::FILE* resultFile = std::fopen("simulation.txt","w");
+
+    std::fprintf(resultFile,"Delivered packages: %llu\n",delivered);
+    std::printf("Delivered packages: %llu\n",delivered);
+
+    std::fprintf(resultFile,"Dropped packages: %llu\n",dropped);
+    std::printf("Dropped packages: %llu\n",dropped);
+
+    bool printDeadAgents = false;
+    bool printAliveAgents = false;
+
+    for(auto& agent : agents){
+        if(agent->getState() == AgentState::DEAD){
+            if(!printDeadAgents){
+                fprintf(resultFile,"Dead Agents:\n");
+                std::cout<<"Dead Agents:\n";
+                printDeadAgents = true;
+            }
+
+            fprintf(resultFile,"Agent#%llu (%s) at (%llu,%llu)",
+                    agent->getId(),
+                    agent->getName().c_str(),
+                    agent->getCoordinates().first,
+                    agent->getCoordinates().second);
+            std::printf("Agent#%llu (%s) at (%llu,%llu)",agent->getId(),
+                    agent->getName().c_str(),
+                    agent->getCoordinates().first,
+                    agent->getCoordinates().second);
+
+            if(agent->getPackages().size() > 0){
+                fprintf(resultFile," has %llu undelivered packages.\n",agent->getPackages().size());
+                std::printf(" has %llu undelivered packages.\n",agent->getPackages().size());
+            }else{
+                fprintf(resultFile," has no undelivered packages.\n");
+                std::printf(" has no undelivered packages.\n");
+            }
+        }
+        else{
+            if(!printAliveAgents){
+                fprintf(resultFile,"Alive Agents:\n");
+                std::cout<<"Alive Agents:\n";
+                printAliveAgents = true;
+            }
+            fprintf(resultFile,"Agent#%llu (%s) at (%llu,%llu)",
+                    agent->getId(),
+                    agent->getName().c_str(),
+                    agent->getCoordinates().first,
+                    agent->getCoordinates().second);
+            std::printf("Agent#%llu (%s) at (%llu,%llu)",agent->getId(),
+                    agent->getName().c_str(),
+                    agent->getCoordinates().first,
+                    agent->getCoordinates().second);
+
+            if(agent->getPackages().size() > 0){
+                fprintf(resultFile," has %llu undelivered packages.\n",agent->getPackages().size());
+                std::printf(" has %llu undelivered packages.\n",agent->getPackages().size());
+            }else{
+                fprintf(resultFile," has no undelivered packages.\n");
+                std::printf(" has no undelivered packages.\n");
+            }
+        }
+    }
+
+    if(hiveMind.getPackages().size() > 0){
+        fprintf(resultFile,"Found %llu undelivered packages at the base.\n",hiveMind.getPackages().size());
+        std::printf("Found %llu undelivered packages at base.\n",hiveMind.getPackages().size());
+        profit += undelivered * static_cast<int>(hiveMind.getPackages().size());
+    }
+
+    std::fprintf(resultFile,"Final Profit: %d\n",profit);
+    std::fclose(resultFile);
     std::cout<<"Profit: "<< profit << std::endl;
 }

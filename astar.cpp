@@ -8,20 +8,10 @@
 #include "agents/agents.h"
 #include "astar.h"
 
-struct State {
-    Pair coord;
-    int battery;
-};
-
 struct Node {
-    // Pair coord;
-    // int g, f;
-    // int h;
-    // Pair parent;
-
-     State state;
-    int g;
-    int f;
+    Pair coord;
+    int g, h, f;
+    Pair parent;
 };
 
 inline int heuristic(Pair a, Pair b) {
@@ -41,7 +31,7 @@ constexpr int STATION_LOW_COST  = 2;
 inline int getG(Cell cell, size_t currentBattery, size_t maxBattery) {
     if (cell == Cell::STATION || cell == Cell::BASE) {
         // the condition is the same with currentBattery*100 / maxBattery <= 10, but it is okay for size_t and bug-free
-        if (currentBattery * 100 <= 50 * maxBattery) {
+        if (currentBattery * 100 <= 25 * maxBattery) {
             return STATION_LOW_COST;
         } else {
             return STATION_HIGH_COST;
@@ -62,74 +52,91 @@ inline bool isPassable(const std::vector<std::vector<Cell>>& map, Pair c,Agent& 
         return map[c.first][c.second] != Cell::WALL;
 }
 
-std::vector<Pair> aStar(const std::vector<std::vector<Cell>>& map, Pair start, Pair end, Agent& agent){
+std::vector<Pair> aStar(const std::vector<std::vector<Cell>>& map, Pair start, Pair end, Agent& agent) {
+    if(start == end){
+        return {start};
+    }
+    size_t rows = map.size();
+    size_t cols = map[0].size();
+
+    std::vector<std::vector<bool>> closed(rows, std::vector<bool>(cols, false));
+    std::vector<std::vector<Pair>> parents(rows, std::vector<Pair>(cols, {-1,-1}));
+
+    struct PQNode { Pair coord; int f; };
+    auto cmp = [](const PQNode &a, const PQNode &b){ return a.f > b.f; };
+    std::priority_queue<PQNode, std::vector<PQNode>, decltype(cmp)> open(cmp);
+    
+
+    std::vector<std::vector<int>> g(rows, std::vector<int>(cols, std::numeric_limits<int>::max()));
+
+    g[start.first][start.second] = 0;
+    open.push({start, heuristic(start,end)});
+    parents[start.first][start.second] = start;
+
+    std::vector<Pair> directions = {{-1,0},{1,0},{0,-1},{0,1}}; // N, S, W, E
+
+    while(!open.empty()) {
+        Pair curr = open.top().coord;
+        open.pop();
+
+        if(curr == end) {
+            // reconstruct path
+            std::vector<Pair> path;
+            Pair p = end;
+            while(p != start) {
+                path.push_back(p);
+                p = parents[p.first][p.second];
+            }
+            std::reverse(path.begin(), path.end());
+            return path;
+        }
+
+        if(closed[curr.first][curr.second]) continue;
+        closed[curr.first][curr.second] = true;
+
+        for(Pair d : directions) {
+            int ni = curr.first + d.first;
+            int nj = curr.second + d.second;
+            Pair neighbor = {ni, nj};
+
+            if(!isValid(neighbor, rows, cols) || !isPassable(map, neighbor,agent) || closed[ni][nj])
+                continue;
+
+            int tentativeG = g[curr.first][curr.second] + getG(map[ni][nj],agent.getCurrentBattery(),agent.getMaxBattery());
+            if(tentativeG < g[ni][nj]) {
+                g[ni][nj] = tentativeG;
+                int f = tentativeG + heuristic(neighbor, end);
+                open.push({neighbor, f});
+                parents[ni][nj] = curr;
+            }
+        }
+    }
+
+    return {};
+}
+
+std::pair<int,int> bfsDistance(const std::vector<std::vector<Cell>>& map, Pair start, Pair end, Agent& agent){
     const size_t rows = map.size();
     const size_t cols = map[0].size();
 
-    const int maxBattery = (int)agent.getMaxBattery();
-    const int consumption = (int)agent.getConsumption();
-    const int recharge = (int)(0.25 * maxBattery);
+    std::vector<std::vector<bool>> visited(rows, std::vector<bool>(cols, false));
+    std::queue<std::pair<Pair, int>> q; // ((x,y), distance)
 
-    // dist[x][y][battery] = best g
-    std::vector dist(rows,
-        std::vector(cols,
-            std::vector<int>(maxBattery + 1, std::numeric_limits<int>::max())
-        )
-    );
+    int stationDensityHint = 0;
 
-    // parent[x][y][battery] = previous state
-    struct Parent {
-        Pair coord;
-        int battery;
-    };
-
-    std::vector parent(rows,
-        std::vector(cols,
-            std::vector<Parent>(maxBattery + 1, {{0,0}, -1})
-        )
-    );
-
-    auto cmp = [](const Node& a, const Node& b) {
-        return a.f > b.f;
-    };
-
-    std::priority_queue<Node, std::vector<Node>, decltype(cmp)> open(cmp);
-
-    State startState{start, (int)agent.getCurrentBattery()};
-    dist[start.first][start.second][startState.battery] = 0;
-
-    open.push({
-        startState,
-        0,
-        heuristic(start, end)
-    });
+    visited[start.first][start.second] = true;
+    q.push({start, 0});
 
     std::vector<Pair> directions = {
         {1,0}, {-1,0}, {0,1}, {0,-1}
     };
 
-    while (!open.empty()) {
-        Node curr = open.top();
-        open.pop();
+    while (!q.empty()) {
+        auto [c, dist] = q.front();
+        q.pop();
 
-        Pair c = curr.state.coord;
-        int b = curr.state.battery;
-
-        // Goal reached
-        if (c == end && b > 0) {
-            std::vector<Pair> path;
-            Pair p = c;
-            int pb = b;
-
-            while (!(p == start && pb == startState.battery)) {
-                path.push_back(p);
-                Parent pr = parent[p.first][p.second][pb];
-                p = pr.coord;
-                pb = pr.battery;
-            }
-
-            std::reverse(path.begin(), path.end());
-            return path;
+        if (c == end) {
+            return {dist,stationDensityHint};
         }
 
         for (auto d : directions) {
@@ -147,30 +154,14 @@ std::vector<Pair> aStar(const std::vector<std::vector<Cell>>& map, Pair start, P
             if (!isPassable(map, next, agent))
                 continue;
 
-            int nextBattery = b - consumption;
-            if (nextBattery <= 0)
-                continue;
-
-            Cell cell = map[next.first][next.second];
-            if (cell == Cell::BASE || cell == Cell::STATION) {
-                nextBattery = std::min(maxBattery, nextBattery + recharge);
-            }
-
-            int nextG = curr.g + 1;
-
-            if (nextG < dist[next.first][next.second][nextBattery]) {
-                dist[next.first][next.second][nextBattery] = nextG;
-                parent[next.first][next.second][nextBattery] = {c, b};
-
-                int f = nextG + heuristic(next, end);
-                open.push({
-                    {next, nextBattery},
-                    nextG,
-                    f
-                });
+            if (!visited[next.first][next.second]) {
+                visited[next.first][next.second] = true;
+                if(map[next.first][next.second] == Cell::STATION || map[next.first][next.second] == Cell::BASE)
+                    stationDensityHint++;
+                q.push({next, dist + 1});
             }
         }
     }
 
-    return {}; // no feasible path
+    return {-1,0};
 }
