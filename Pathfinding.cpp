@@ -6,7 +6,7 @@
 
 #include "types.h"
 #include "agents/agents.h"
-#include "astar.h"
+#include "pathfinding.h"
 
 struct Node {
     Pair coord;

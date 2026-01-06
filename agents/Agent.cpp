@@ -1,6 +1,6 @@
 #include "agents.h"
 #include "../hivemind.h"
-#include "../astar.h"
+#include "../pathfinding.h"
 #include "../types.h"
 
 size_t Agent::numberOfAgents = 0;

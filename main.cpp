@@ -1,6 +1,6 @@
 #include "genesis/IMapGenerator.h"
 #include "agents/agents.h"
-#include "astar.h"
+#include "pathfinding.h"
 
 #include <iostream>
 #include <fstream>

@@ -31,19 +31,6 @@ inline std::unordered_map<Cell,char> cellChar = {
         {Cell::CLIENT,'D'}
 };
 
-enum class SimulationParameterKeys{
-    ROWS,
-    COLUMNS,
-    MAX_TICKS,
-    MAX_STATIONS,
-    CLIENTS_COUNT,
-    DRONES,
-    ROBOTS,
-    SCOOTERS,
-    TOTAL_PACKAGES,
-    SPAWN_FREQUENCY
-};
-
 enum class TerrainType{
     AIR,
     GROUND

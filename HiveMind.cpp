@@ -1,6 +1,6 @@
 #include "hivemind.h"
 #include "types.h"
-#include "astar.h"
+#include "pathfinding.h"
 
 #include <fstream>
 #include <iostream>
