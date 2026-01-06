@@ -114,7 +114,7 @@ void Agent::tick(const std::vector<std::vector<Cell>>& map, HiveMind& hiveMind, 
         profit += deadAgent;
         deadAgents++;
         dropPackages(profit, dropped,hiveMind);
-        logMessage("mf is deadass.");
+        logMessage("DEAD.");
     }
 }
 

@@ -1,11 +1,11 @@
 Delivered packages: 50
 Dropped packages: 0
 Dead Agents:
-Agent#1 (DRONE) at (15,18) has no undelivered packages.
-Agent#2 (DRONE) at (12,18) has no undelivered packages.
-Agent#3 (DRONE) at (12,18) has no undelivered packages.
+Agent#1 (DRONE) at (7,3) has no undelivered packages.
+Agent#2 (DRONE) at (6,6) has no undelivered packages.
+Agent#3 (DRONE) at (7,3) has no undelivered packages.
 Alive Agents:
-Agent#4 (ROBOT) at (8,5) has no undelivered packages.
-Agent#5 (ROBOT) at (10,12) has no undelivered packages.
-Agent#6 (SCOOTER) at (15,9) has no undelivered packages.
-Final Profit: 19579
+Agent#4 (ROBOT) at (7,6) has no undelivered packages.
+Agent#5 (ROBOT) at (9,13) has no undelivered packages.
+Agent#6 (SCOOTER) at (9,13) has no undelivered packages.
+Final Profit: 21130
