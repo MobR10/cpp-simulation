@@ -7,6 +7,7 @@
 #include <vector>
 #include <memory>
 #include <utility>
+#include <cassert>
 
 #include <chrono>
 #include <thread>
@@ -23,7 +24,7 @@ const AgentState MOVING = AgentState::MOVING;
 int main(){
    
     HiveMind hiveMind;
-    hiveMind.loadSimulationFile();
+    assert(hiveMind.loadSimulationFile());
 
     MapGenerator generator(new ProceduralMapGenerator(hiveMind));
     generator.runStrategy();
@@ -172,4 +173,7 @@ int main(){
     std::fprintf(resultFile,"Final Profit: %d\n",profit);
     std::fclose(resultFile);
     std::cout<<"Profit: "<< profit << std::endl;
+    
+    std::getchar();
+    return 0;
 }

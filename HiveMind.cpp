@@ -26,11 +26,11 @@ void readField(std::ifstream& buff,t& field){
 
 HiveMind::HiveMind(){}
 
-void HiveMind::loadSimulationFile(){
+bool HiveMind::loadSimulationFile(){
     std::ifstream fin(simulationFile);
     if(!fin.is_open()){
         std::cerr<<"Couln't open the file " << simulationFile << "\n";
-        return;
+        return false;
     }
     
     // rows and columns are hardcoded because MAP_SIZE is followed by 2 values
@@ -49,6 +49,29 @@ void HiveMind::loadSimulationFile(){
     readField<size_t>(fin,packagesN);
     readField<size_t>(fin,spawnFreqN);
 
+    fin.close();
+
+    if(dronesN + robotsN + scootersN == 0){
+        std::cerr<<"No agents specified in the simulation file!\n";
+        return false;
+    }
+    if(maxTicksN == 0){
+        std::cerr<<"Max ticks cannot be zero!\n";
+        return false;
+    }
+    if(packagesN == 0){
+        std::cerr<<"No packages to deliver specified in the simulation file!\n";
+        return false;
+    }
+    if(spawnFreqN == 0){
+        std::cerr<<"Spawn frequency cannot be zero!\n";
+        return false;
+    }
+    if(clientsN == 0){
+        std::cerr<<"No clients specified in the simulation file!\n";
+        return false;
+    }
+
     // ADD AGENTS TO A LIST
     agentsN = dronesN + scootersN + robotsN;
 
@@ -60,6 +83,8 @@ void HiveMind::loadSimulationFile(){
 
     for(size_t i = 0; i < scootersN; i++)
         agents.push_back(std::make_unique<Scooter>());
+
+    return 1;
 }
 
 void HiveMind::setMap(std::vector<std::vector<Cell>> _map){

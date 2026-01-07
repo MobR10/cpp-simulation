@@ -34,7 +34,7 @@ class HiveMind{
 
     public:
         HiveMind();
-        void loadSimulationFile();
+        bool loadSimulationFile();
 
         size_t getRowsN() const { return rowsN; }
         size_t getColumnsN() const { return columnsN; }
